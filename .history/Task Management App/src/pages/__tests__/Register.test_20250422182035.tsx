@@ -1,0 +1,24 @@
+import { render, screen, fireEvent } from "@testing-library/react";
+import Register from "../Register"; // สมมุติว่า Register เป็น component ที่คุณทดสอบ
+
+describe("Register component", () => {
+  it("submits form with valid inputs", async () => {
+    render(<Register />);
+
+    // ใช้ findByLabelText แทน getByLabelText เพื่อให้รองรับการ render ที่เป็น async
+    const emailInput = await screen.findByLabelText(/email/i);
+    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+
+    const passwordInput = await screen.findByLabelText(/password/i);
+    fireEvent.change(passwordInput, { target: { value: "password123" } });
+
+    // หาปุ่ม submit และคลิก
+    const submitButton = screen.getByRole("button", { name: /สมัครสมาชิก/i });
+    fireEvent.click(submitButton);
+
+    // ตรวจสอบว่า alert ถูกแสดงหรือไม่
+    await screen.findByText(/สมัครสมาชิกสำเร็จ/); // ใช้ findByText เพราะคำตอบแสดงในข้อความหลัง submit
+  });
+});
+
+
