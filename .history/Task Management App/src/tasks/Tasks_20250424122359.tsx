@@ -6,6 +6,7 @@ import {
 import {
   LogoutOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CheckOutlined
 } from '@ant-design/icons';
+import { notification } from 'antd';
 
 
 const { Title, Text } = Typography;

@@ -6,7 +6,7 @@ import {
 import {
   LogoutOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CheckOutlined
 } from '@ant-design/icons';
-
+import { notification } from 'antd';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -92,12 +92,12 @@ export default function Tasks() {
       setFormError('Cannot edit task without a title.');
       return;
     }
-
+  
     if (updates.title !== undefined && !updates.title.trim()) {
       setFormError('Title is required');
       return;
     }
-
+  
     setFormError(null);
     try {
       const res = await fetch(`http://localhost:5000/api/tasks/${_id}`, {
@@ -108,10 +108,17 @@ export default function Tasks() {
       const updated: Task = await res.json();
       setTasks(prev => prev.map(t => (t._id === _id ? updated : t)));
       setEditingId(null);
+  
+      // ✅ แจ้งเตือนเมื่อบันทึกสำเร็จ
+        message: 'บันทึกสำเร็จ',
+        description: 'ข้อมูลของคุณถูกอัปเดตแล้ว',
+        placement: 'topRight',
+      });
     } catch (err) {
       console.error('Error updating task:', err);
     }
   };
+  
 
   const handleDelete = async (_id: string) => {
     try {
