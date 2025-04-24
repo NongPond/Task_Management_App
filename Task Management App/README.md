@@ -1,3 +1,18 @@
+//run vite
+cd "Task Management App"
+npm run dev
+o enter เปิดหน้าเว็บ
+//run server
+npm run start 
+
+//test
+npx vitest run
+npx vitest run --coverage
+
+//run cypress
+npx cypress open
+
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
