@@ -12,6 +12,8 @@ npx vitest run --coverage
 //run cypress
 npx cypress open
 
+มีเพิ่มจาก regiter แล้ว เอาเรื่อง
+
 
 # React + TypeScript + Vite
 
