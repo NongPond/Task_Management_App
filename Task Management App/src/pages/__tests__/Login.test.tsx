@@ -1,8 +1,7 @@
-// src/components/__tests__/Login.test.tsx
+import { vi, describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import Login from "../../auth/Login";
-import { vi } from "vitest";
 
 // Mock useNavigate
 const mockNavigate = vi.fn();
@@ -16,91 +15,119 @@ vi.mock("react-router-dom", async () => {
 
 describe("Login Component", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     localStorage.clear();
+
+    // ✅ Mock matchMedia to prevent AntD error
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(), // deprecated
+        removeListener: vi.fn(), // deprecated
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
   });
 
-  it("แสดง input อีเมล และ รหัสผ่าน", () => {
-    render(<Login />, { wrapper: MemoryRouter });
+  const setup = () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+  };
 
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+  it("renders form elements correctly", () => {
+    setup();
+    expect(screen.getByRole("heading", { name: /เข้าสู่ระบบ/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /เข้าสู่ระบบ/i })).toBeInTheDocument();
   });
 
-  it("แสดง error ถ้าไม่ได้กรอกข้อมูล", async () => {
-    render(<Login />, { wrapper: MemoryRouter });
+  it("shows validation errors on empty submit", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: /เข้าสู่ระบบ/i }));
+    expect(await screen.findByText("กรุณากรอกอีเมล")).toBeInTheDocument();
+    expect(await screen.findByText("กรุณากรอกรหัสผ่าน")).toBeInTheDocument();
+  });
 
+  it("shows error for invalid email format", async () => {
+    setup();
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "invalid" } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /เข้าสู่ระบบ/i }));
+    expect(await screen.findByText("รูปแบบอีเมลไม่ถูกต้อง")).toBeInTheDocument();
+  });
+
+  it("shows error if login fails (wrong credentials)", async () => {
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({ message: "Invalid credentials" }),
+      })
+    ));
+
+    setup();
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /เข้าสู่ระบบ/i }));
 
-    expect(await screen.findByText(/กรุณากรอกอีเมล/)).toBeInTheDocument();
-    expect(await screen.findByText(/กรุณากรอกรหัสผ่าน/)).toBeInTheDocument();
+    expect(await screen.findByText("❌ อีเมลหรือรหัสผ่านไม่ถูกต้อง")).toBeInTheDocument();
   });
 
-  it("เข้าสู่ระบบสำเร็จ และ redirect", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ token: "mock-token", email: "test@example.com" }),
-    } as Response);
+  it("navigates to /tasks on successful login", async () => {
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ token: "abc123", email: "test@example.com" }),
+      })
+    ));
 
-    render(<Login />, { wrapper: MemoryRouter });
-
-    fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
-      target: { value: "test@example.com" },
-    });
-
-    fireEvent.change(screen.getByPlaceholderText("••••••••"), {
-      target: { value: "123456" },
-    });
-
+    setup();
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /เข้าสู่ระบบ/i }));
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/tasks");
+      expect(localStorage.getItem("token")).toBe("abc123");
+      expect(localStorage.getItem("email")).toBe("test@example.com");
     });
-
-    expect(localStorage.getItem("token")).toBe("mock-token");
-    expect(localStorage.getItem("email")).toBe("test@example.com");
   });
 
-  it("แสดง error ถ้าอีเมลหรือรหัสผ่านผิด", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ message: "Invalid credentials" }),
-    } as Response);
+  // New Test: Check for network failure
+  it("shows error if login fails due to network issues", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("Network error"))));
 
-    render(<Login />, { wrapper: MemoryRouter });
-
-    fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
-      target: { value: "wrong@example.com" },
-    });
-
-    fireEvent.change(screen.getByPlaceholderText("••••••••"), {
-      target: { value: "wrongpass" },
-    });
-
+    setup();
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /เข้าสู่ระบบ/i }));
 
-    expect(await screen.findByText(/อีเมลหรือรหัสผ่านไม่ถูกต้อง/)).toBeInTheDocument();
+    expect(await screen.findByText("⚠️ เกิดข้อผิดพลาดในการเข้าสู่ระบบ")).toBeInTheDocument();
   });
 
-  it("แสดง error ถ้า fetch มีปัญหา", async () => {
-    vi.spyOn(global, "fetch").mockRejectedValueOnce(new Error("Network error"));
-
-    render(<Login />, { wrapper: MemoryRouter });
-
-    fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
-      target: { value: "test@example.com" },
-    });
-
-    fireEvent.change(screen.getByPlaceholderText("••••••••"), {
-      target: { value: "123456" },
-    });
-
+  // New Test: Check for password too short
+  it("shows error if password is too short", async () => {
+    setup();
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "123" } });
     fireEvent.click(screen.getByRole("button", { name: /เข้าสู่ระบบ/i }));
 
-    expect(await screen.findByText(/เกิดข้อผิดพลาดในการเข้าสู่ระบบ/)).toBeInTheDocument();
+    expect(await screen.findByText("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")).toBeInTheDocument();
   });
+
 });
+
+
+
+
 
 
 
